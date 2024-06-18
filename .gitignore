@@ -3,6 +3,7 @@ Saved/
 .vs/
 .vscode/
 Binaries/
-Content/
+Content/imported/
 Intermediate/
 .vsconfig
+*_BuiltData.uasset
