@@ -6,6 +6,7 @@
 #include "VaRestRequestJSON.h"
 #include "VaRestJsonObject.h"
 #include "HttpModule.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
@@ -40,28 +41,28 @@ struct FVoiceTasksState
 	FString VoiceId;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool VoiceFileReady;
+	bool bVoiceFileReady;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool VoiceFileJsonReady;
+	bool bVoiceFileJsonReady;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool TaskFinished;
+	bool bTaskFinished;
 
-	FVoiceTasksState() : VoiceId(""), VoiceFileReady(false), VoiceFileJsonReady(false), TaskFinished(false)
+	FVoiceTasksState() : VoiceId(""), bVoiceFileReady(false), bVoiceFileJsonReady(false), bTaskFinished(false)
 	{
 	}
 
 };
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
-class BROADCASTER_API UNPC_Talk_component : public UActorComponent
+class BROADCASTER_API UNpcTalkComponent : public UActorComponent
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	UNPC_Talk_component();
+	UNpcTalkComponent();
 
 	UPROPERTY(BlueprintReadWrite,EditAnywhere)
 	TArray<FVoiceFiles> VoiceFilesArray;
@@ -71,10 +72,15 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString HttpUrl;
+	
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	bool bIsTalking = false;
+
+	void UpdateVoiceTaskState(FString VoiceId, FString FileType, bool bState);
 
 public:	
 	// Called every frame
@@ -83,14 +89,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "NPC_Talk")
 	void SaveVoiceFile(const TArray<FString>& VoiceIds);
 
+	UFUNCTION(BlueprintCallable, Category = "NPC_Talk")
 	void ExecuteVoiceTask();
 
-	void OnVoiceRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceID, FString VoiceUrl);
+	void OnVoiceRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceId, FString VoiceUrl);
 
-	void OnJsonRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceID, FString JsonUrl);
+	void OnJsonRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceId, FString JsonUrl);
 
 	UFUNCTION(BlueprintCallable, Category = "NPC_Talk")
-	void TryDownload(const FString& VoiceID, const FString& Url);
+	void TryDownload(const FString& VoiceId, const FString& Url);
+
+	UFUNCTION(BlueprintCallable, Category = "NPC_Talk")
+	void ResetTalk();
+	
 
 };
 
