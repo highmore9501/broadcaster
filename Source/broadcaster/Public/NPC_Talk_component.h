@@ -54,7 +54,7 @@ struct FVoiceTasksState
 
 };
 
-UCLASS()
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class BROADCASTER_API UNPC_Talk_component : public UActorComponent
 {
 	GENERATED_BODY()
@@ -81,7 +81,7 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	UFUNCTION(BlueprintCallable, Category = "NPC_Talk")
-	void SaveVoiceFile(TArray<FString>& VoiceIDs);
+	void SaveVoiceFile(const TArray<FString>& VoiceIds);
 
 	void ExecuteVoiceTask();
 
@@ -89,6 +89,7 @@ public:
 
 	void OnJsonRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceID, FString JsonUrl);
 
+	UFUNCTION(BlueprintCallable, Category = "NPC_Talk")
 	void TryDownload(const FString& VoiceID, const FString& Url);
 
 };

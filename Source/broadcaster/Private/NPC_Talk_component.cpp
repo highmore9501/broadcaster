@@ -25,7 +25,7 @@ void UNPC_Talk_component::TickComponent(float DeltaTime, ELevelTick TickType, FA
 
 }
 
-void UNPC_Talk_component::SaveVoiceFile(TArray<FString>& VoiceIDs)
+void UNPC_Talk_component::SaveVoiceFile(const TArray<FString>& VoiceIds)
 {
 	if (HttpUrl == "")
 	{
@@ -33,16 +33,16 @@ void UNPC_Talk_component::SaveVoiceFile(TArray<FString>& VoiceIDs)
 		return;
 	}
 	// 遍历VoiceIDs,生成访问url
-	for (int i = 0; i < VoiceIDs.Num(); i++)
+	for (int i = 0; i < VoiceIds.Num(); i++)
 	{
-		FString VoiceID = VoiceIDs[i];
-		FString VoiceUrl = HttpUrl + VoiceID + ".wav";
+		FString VoiceId = VoiceIds[i];
+		FString VoiceUrl = HttpUrl + VoiceId + ".wav";
 		// 生成文件下载任务
-		TryDownload(VoiceID, VoiceUrl);
+		TryDownload(VoiceId, VoiceUrl);
 
-		FString JsonUrl = HttpUrl + VoiceID + ".json";
+		FString JsonUrl = HttpUrl + VoiceId + ".json";
 		// 生成文件下载任务
-		TryDownload(VoiceID, JsonUrl);
+		TryDownload(VoiceId, JsonUrl);
 	}
 	
 }
@@ -51,32 +51,35 @@ void UNPC_Talk_component::ExecuteVoiceTask()
 {
 }
 
-void UNPC_Talk_component::OnVoiceRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceID, FString VoiceUrl)
+void UNPC_Talk_component::OnVoiceRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceId, FString VoiceUrl)
 {
-	if (bWasSuccessful)
+	if (bWasSuccessful && Response->GetResponseCode() == 200)
 	{
 		TArray<uint8> VoiceData = Response->GetContent();
+		UE_LOG(LogTemp, Warning, TEXT("VoiceData size: %d"), VoiceData.Num());
 		UStreamingSoundWave* StreamingSoundWave = NewObject<UStreamingSoundWave>();
 		StreamingSoundWave->AppendAudioDataFromEncoded(VoiceData, ERuntimeAudioFormat::Wav);
 		// 遍历VoiceFileArray,找到对应的VoiceFile,将StreamingSoundWave赋值给VoiceFile，如果找不到就新建一个
 		bool bFound = false;
 		for (int i = 0; i < VoiceFilesArray.Num(); i++)
 		{
-			FVoiceFiles VoiceFile = VoiceFilesArray[i];
-			if (VoiceID == VoiceFile.VoiceId)
+			FVoiceFiles& VoiceFile = VoiceFilesArray[i];
+			if (VoiceId == VoiceFile.VoiceId)
 			{
 				VoiceFile.VoiceFile = StreamingSoundWave;
 				bFound = true;
+				UE_LOG(LogTemp, Warning, TEXT("VoiceID: %s wav update success."), *VoiceId);
 				break;
 			}
 		}
 		if (!bFound)
 		{
 			FVoiceFiles VoiceFile;
-			VoiceFile.VoiceId = VoiceID;
+			VoiceFile.VoiceId = VoiceId;
 			VoiceFile.VoiceFile = StreamingSoundWave;
 			VoiceFilesArray.Add(VoiceFile);
-		}
+			UE_LOG(LogTemp, Warning, TEXT("New VoiceID: %s wav download success."), *VoiceId);
+		}	
 	}
 	else
 	{
@@ -86,31 +89,40 @@ void UNPC_Talk_component::OnVoiceRequestReady(FHttpRequestPtr Request, FHttpResp
 
 		// 创建一个委托并绑定到TryDownload方法，同时传递所需的参数
 		FTimerDelegate TimerDel;
-		TimerDel.BindUFunction(this, FName("TryDownload"), VoiceID, VoiceUrl);
+		TimerDel.BindUFunction(this, FName("TryDownload"), VoiceId, VoiceUrl);
+
+		if (GetWorld() == nullptr)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GetWorld() returned nullptr. Delayed download cannot be scheduled."));
+			return;
+		}
 
 		// 使用创建的委托来设置计时器
 		GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDel, Delay, false);
+		UE_LOG(LogTemp, Warning, TEXT("restart wav quest %s :"), *VoiceId);
 
 	}
 }
 
-void UNPC_Talk_component::OnJsonRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceID, FString JsonUrl)
+void UNPC_Talk_component::OnJsonRequestReady(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, FString VoiceId, FString JsonUrl)
 {
-	if (bWasSuccessful)
+	if (bWasSuccessful && Response->GetResponseCode()==200)
 	{
 		// 以json格式接收数据
 		UVaRestJsonObject* VaRestJsonObject = NewObject<UVaRestJsonObject>();
 		FString JsonStr = Response->GetContentAsString();
+		UE_LOG(LogTemp, Warning, TEXT("JsonStr: %s"), *JsonStr);
 		VaRestJsonObject->DecodeJson(JsonStr);
 		// 遍历VoiceFileArray,找到对应的VoiceFileJson,将vaRestJsonObject赋值给VoiceFileJson，如果找不到就新建一个
 		bool bFound = false;
 		for (int i = 0; i < VoiceFilesArray.Num(); i++)
 		{
-			FVoiceFiles VoiceFile = VoiceFilesArray[i];
-			if (VoiceID == VoiceFile.VoiceId)
+			FVoiceFiles& VoiceFile = VoiceFilesArray[i];
+			if (VoiceId == VoiceFile.VoiceId)
 			{
 				VoiceFile.VoiceFileJson = VaRestJsonObject;
 				bFound = true;
+				UE_LOG(LogTemp, Warning, TEXT("VoiceID: %s json update success."), *VoiceId);
 				break;
 			}
 		}
@@ -118,9 +130,10 @@ void UNPC_Talk_component::OnJsonRequestReady(FHttpRequestPtr Request, FHttpRespo
 		if (!bFound)
 		{
 			FVoiceFiles VoiceFile;
-			VoiceFile.VoiceId = VoiceID;
+			VoiceFile.VoiceId = VoiceId;
 			VoiceFile.VoiceFileJson = VaRestJsonObject;
 			VoiceFilesArray.Add(VoiceFile);
+			UE_LOG(LogTemp, Warning, TEXT("New VoiceID: %s json download success."), *VoiceId);
 		}
 		
 	}
@@ -132,24 +145,33 @@ void UNPC_Talk_component::OnJsonRequestReady(FHttpRequestPtr Request, FHttpRespo
 
 		// 创建一个委托并绑定到TryDownload方法，同时传递所需的参数
 		FTimerDelegate TimerDel;
-		TimerDel.BindUFunction(this, FName("TryDownload"), VoiceID, JsonUrl);
+		TimerDel.BindUFunction(this, FName("TryDownload"), VoiceId, JsonUrl);
+
+		if (GetWorld() == nullptr)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GetWorld() returned nullptr. Delayed download cannot be scheduled."));
+			return;
+		}
 
 		// 使用创建的委托来设置计时器
 		GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDel, Delay, false);
+		UE_LOG(LogTemp, Warning, TEXT("restart json quest %s :"), *VoiceId);
 	
 	}
 }
 
-void UNPC_Talk_component::TryDownload(const FString& VoiceID, const FString& Url)
+void UNPC_Talk_component::TryDownload(const FString& VoiceId, const FString& Url)
 {
 	TSharedRef<IHttpRequest> HttpVoiceRequest = FHttpModule::Get().CreateRequest();
 	if (Url.EndsWith(".wav")) 
 	{
-		HttpVoiceRequest->OnProcessRequestComplete().BindUObject(this, &UNPC_Talk_component::OnVoiceRequestReady, VoiceID, Url);
+		HttpVoiceRequest->OnProcessRequestComplete().BindUObject(this, &UNPC_Talk_component::OnVoiceRequestReady, VoiceId, Url);
+		UE_LOG(LogTemp, Warning, TEXT("wav request %s bind Onready success!"),*VoiceId);
 	}
 	else if (Url.EndsWith(".json"))
 	{
-		HttpVoiceRequest->OnProcessRequestComplete().BindUObject(this, &UNPC_Talk_component::OnJsonRequestReady, VoiceID, Url);
+		HttpVoiceRequest->OnProcessRequestComplete().BindUObject(this, &UNPC_Talk_component::OnJsonRequestReady, VoiceId, Url);
+		UE_LOG(LogTemp, Warning, TEXT("wav request %s bind Onready success!"), *VoiceId);
 	}
 	else
 	{
