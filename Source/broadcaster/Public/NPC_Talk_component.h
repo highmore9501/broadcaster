@@ -12,6 +12,9 @@
 #include "Components/ActorComponent.h"
 #include "NPC_Talk_component.generated.h"
 
+
+
+
 USTRUCT(BlueprintType)
 struct FVoiceFiles
 {
@@ -55,6 +58,8 @@ struct FVoiceTasksState
 
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnJsonReadyDelegate, UVaRestJsonObject*, JsonObject);
+
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class BROADCASTER_API UNpcTalkComponent : public UActorComponent
 {
@@ -72,6 +77,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FString HttpUrl;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnJsonReadyDelegate OnJsonReady;
 	
 
 protected:

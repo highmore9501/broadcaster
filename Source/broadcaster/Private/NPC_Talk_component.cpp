@@ -102,6 +102,13 @@ void UNpcTalkComponent::ExecuteVoiceTask()
 				USoundWave* SoundWave = VoiceFile.VoiceFile;
 				UGameplayStatics::PlaySound2D(GetWorld(), SoundWave);
 
+				//将json文件广播出去，方法还没写
+				UVaRestJsonObject* VaRestJsonObject = VoiceFile.VoiceFileJson;
+
+				if (VaRestJsonObject) {
+					OnJsonReady.Broadcast(VaRestJsonObject);
+				}
+
 				// 获取音频持续时间
 				float Duration = SoundWave->Duration;
 
