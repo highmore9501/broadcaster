@@ -14,16 +14,14 @@ UReadyPlayerNpcMouthDriver::UReadyPlayerNpcMouthDriver()
 	// ...
 }
 
-void UReadyPlayerNpcMouthDriver::SetShapeKeyMap(TArray<FShapeKeyMap>& In)
-{
-	ShapeKeyMaps = In;
-}
 
-bool UReadyPlayerNpcMouthDriver::PareseJsonToMotionData(TArray<UVaRestJsonObject*>& JsonObject)
+
+bool UReadyPlayerNpcMouthDriver::PareseJsonToMotionData(const TArray<UVaRestJsonObject*>& JsonObject)
 {
 	for (auto& Json : JsonObject)
 	{
 		float Start = Json->GetNumberField("start");
+		float End = Json->GetNumberField("end");
 		FString RhubarbShapeKey = Json->GetStringField("value");
 		if (RhubarbShapeKey.IsEmpty())
 		{
@@ -39,7 +37,7 @@ bool UReadyPlayerNpcMouthDriver::PareseJsonToMotionData(TArray<UVaRestJsonObject
 			}
 		}
 
-		MotionDatas.Add(FMotionData{ VisemeName, Start });
+		MotionDatas.Add(FMotionData{ VisemeName, Start,End });
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("Parsed %d motion data"), MotionDatas.Num());
@@ -53,6 +51,7 @@ void UReadyPlayerNpcMouthDriver::ResetAnimationState()
 	bIsTransitioning = false;
 	CurrentTransitionTime = 0.0f;
 	LastKeyframeTime = 0.0f;
+	MotionDatas.Empty();	
 }
 
 void UReadyPlayerNpcMouthDriver::ApplyShapeKeyTransition(FName StartViseme, FName EndViseme, float Fraction)
@@ -123,10 +122,16 @@ void UReadyPlayerNpcMouthDriver::TickComponent(float DeltaTime, ELevelTick TickT
 	{
 		if (!bIsTransitioning)
 		{
+			// 每个shapekey的数组第一次进到这里，都会设置以下的值
+			// 当前shapekey的名称
 			CurrentVisemeName = MotionDatas[CurrentKeyframe].VisemeName;
-			NextVisemeName = MotionDatas[CurrentKeyframe + 1].VisemeName;
-			LastKeyframeTime = MotionDatas[CurrentKeyframe].ActiveTime;
+			// 下一个shapekey的名称
+			NextVisemeName = (CurrentKeyframe + 1 < MotionDatas.Num()) ? MotionDatas[CurrentKeyframe + 1].VisemeName : "None";
+			// 本次转换一共会消耗的时间
+			LastKeyframeTime = MotionDatas[CurrentKeyframe].EndTime - MotionDatas[CurrentKeyframe].StartTime;
+			// 标记已经开始转换，这样在转化结束前就不会再次进到这个if里面
 			bIsTransitioning = true;
+			// 初始化当前时间
 			CurrentTransitionTime = 0.0f;
 		}
 
@@ -136,11 +141,16 @@ void UReadyPlayerNpcMouthDriver::TickComponent(float DeltaTime, ELevelTick TickT
 		// Assuming you have a method to interpolate between shape keys based on TransitionFraction
 		ApplyShapeKeyTransition(CurrentVisemeName, NextVisemeName, TransitionFraction);
 
-		if (CurrentTransitionTime >= TransitionTime)
+		if (CurrentTransitionTime >= LastKeyframeTime)
 		{
+			// 进到这里表示本次变形已经结束，设置一些标记，然后进入下一次变形
 			bIsTransitioning = false;
 			CurrentKeyframe++;
 		}
+	}
+	else if (CurrentKeyframe >= MotionDatas.Num() - 1 && !bIsTransitioning)
+	{
+		ResetAnimationState();
 	}
 }
 

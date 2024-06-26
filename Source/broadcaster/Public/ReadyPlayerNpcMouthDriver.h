@@ -30,7 +30,10 @@ struct FMotionData
 	FName VisemeName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float ActiveTime;
+	float StartTime;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float EndTime;
 
 };
 
@@ -46,14 +49,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FShapeKeyMap> ShapeKeyMaps;
 
-	UFUNCTION(BlueprintCallable)
-	void SetShapeKeyMap(TArray<FShapeKeyMap>& In);
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FMotionData> MotionDatas;
 
 	UFUNCTION(BlueprintCallable)
-	bool PareseJsonToMotionData(TArray<UVaRestJsonObject*>& JsonObject);
+	bool PareseJsonToMotionData(const TArray<UVaRestJsonObject*>& JsonObject);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USkeletalMeshComponent* NpcSkeletalMeshComponent;
@@ -69,12 +69,19 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	// 播放语音用的关键帧索引
 	int32 CurrentKeyframe = 0;
-	float TransitionTime = 0.1f;
+	// 计算变形插值时所用的当前时间值
 	float CurrentTransitionTime = 0.0f;
+	// 单次变形消耗的时间
+	float TransitionTime = 0.1f;
+	// 是否正在执行变形插值
 	bool bIsTransitioning = false;
+	// 当前shapekey的名称
 	FName CurrentVisemeName;
+	// 下一个shapekey的名称
 	FName NextVisemeName;
+	// 当前发音结束的时间
 	float LastKeyframeTime = 0.0f;
 
 
